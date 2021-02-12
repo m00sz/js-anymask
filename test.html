@@ -11,7 +11,12 @@
         <script>
             $(document).ready(function(){
                 $("#input").anymask({
-                    mask: "99/99/9999"
+                    mask: "99/99/9999",
+                    type: "date",
+                    format: "DD/MM/YYYY",
+                    // callback: function(el){
+                    //     console.log(el);
+                    // }
                 });
             });
         </script>

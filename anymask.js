@@ -5,29 +5,54 @@
 */
 (function($){
 
-    $.fn.anymask = function(_options){
+    /* VARS */
+    var momentJSScript;
 
-        String.prototype.replaceAt = function () {
-            var rlen = arguments[2] == null ? 1 : arguments[2];
-            return this.substring(0, arguments[0]) + arguments[1] + this.substring(arguments[0] + rlen);
-        }
+    // <script id="libRequired-MomentJS" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js" integrity="sha512-LGXaggshOkD/at6PFNcp2V2unf9LzFq6LE+sChH7ceMTDP0g2kn6Vxwgg7wkPP7AAtX+lmPqPdxB47A0Nz0cMQ==" crossorigin="anonymous"></script>
 
-        function setCaretPosition(ctrl, pos) {
+    /* CREATE AUX FUNCTION */
+    if (typeof $.fn.setCaretPos === typeof undefined){
+        $.fn.setCaretPos = function(pos) {
+            var thisElement = this.get(0);
+
             // Modern browsers
-            if (ctrl.setSelectionRange)
+            if (thisElement.setSelectionRange)
             {
-                ctrl.focus();
-                ctrl.setSelectionRange(pos, pos);
+                thisElement.focus();
+                thisElement.setSelectionRange(pos, pos);
             
             // IE8 and below
-            } else if (ctrl.createTextRange) {
-                var range = ctrl.createTextRange();
+            } else if (thisElement.createTextRange) {
+                var range = thisElement.createTextRange();
                 range.collapse(true);
                 range.moveEnd('character', pos);
                 range.moveStart('character', pos);
                 range.select();
             }
+        };
+    }
+
+    /* CREATE AUX FUNCTION */
+    if (typeof String.prototype.replaceAt === typeof undefined) {
+        String.prototype.replaceAt = function () {
+            var rlen = arguments[2] == null ? 1 : arguments[2];
+            return this.substring(0, arguments[0]) + arguments[1] + this.substring(arguments[0] + rlen);
         }
+    }
+
+    $.fn.anymask = function(_options){
+        /* CREATE AND APPEND MOMENTJS TO THE HEAD */
+        if (typeof momentJSScript === typeof undefined) {
+            momentJSScript = document.createElement("script");
+            momentJSScript = $(momentJSScript);
+            momentJSScript.attr({
+                id: "libRequired-MomentJS",
+                src: "https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment-with-locales.min.js",
+                integrity: "sha512-LGXaggshOkD/at6PFNcp2V2unf9LzFq6LE+sChH7ceMTDP0g2kn6Vxwgg7wkPP7AAtX+lmPqPdxB47A0Nz0cMQ==",
+                crossorigin: "anonymous"
+            });
+            $(document).find("head").append(momentJSScript);
+        }       
 
         var thisElement = $(this);
         if (typeof thisElement === typeof undefined)
@@ -49,6 +74,7 @@
             return null;
         }        
 
+        /* OPTIONS */
         var options = _options || {};
         var maskOption = (options.hasOwnProperty("mask") && typeof options["mask"] !== typeof undefined);
         var maskOptionValue = options["mask"];
@@ -58,6 +84,8 @@
         var formatOptionValue = options["format"];
         var callbackOption = (options.hasOwnProperty("callback") && typeof options["callback"] !== typeof undefined);
         var callbackOptionValue = options["callback"];
+
+        /* VALIDATE OPTIONS */
         if (!maskOption){
             console.error("Missing \"mask(string|array)\"  options.");                
             return null;
@@ -75,11 +103,16 @@
             var textValue = thisElement.val();
             textValue = textValue.replace(/[^0-9]/g, "");
 
-            if ((charCode > 31 && (charCode < 48 || charCode > 57)) || textValue.length === maskLength) {
+            var validKey = ((charCode >= 48 && charCode <= 57) || (charCode >= 96 && charCode <= 105) || charCode === 8 || charCode === 37 || charCode === 39);
+            if (validKey === false){
                 keyEvent.preventDefault();
                 return false; 
-            }
+            } else if (charCode !== 8 && charCode !== 37 && charCode !== 39 && textValue.length === maskLength) {
+                keyEvent.preventDefault();
+                return false; 
+            }             
         });
+
         thisElement.keyup(function(keyEvent){
             keyEvent = (keyEvent) ? keyEvent : window.event;
             var charCode = (keyEvent.which) ? keyEvent.which : keyEvent.keyCode;
@@ -109,7 +142,6 @@
                 thisElement.val(finalValue);
                 if (maskLength === textValue.length)
                 {
-                    setCaretPosition(thisElement.get(0), 0);
                     if (typeOption)
                     {
                         if (typeOptionValue === "date")
@@ -118,9 +150,27 @@
                             {
                                 if (callbackOption)
                                 {
+                                    callbackOptionValue(thisElement);
     
-                                } else {
-                                    
+                                } else {                                    
+                                    try {
+                                        var date = moment(finalValue, formatOptionValue);
+                                        if (date.isValid()){
+                                            // thisElement.css("border", "1px solid green");
+                                        } else {
+                                            thisElement.val("");
+                                            thisElement.setCaretPos(0);
+                                            // thisElement.css("border", "1px solid red");
+                                        }                                        
+                                    } catch (error) {
+                                        thisElement.val(placeholderMask);
+                                        thisElement.setCaretPos(0);
+                                        // thisElement.css("border", "1px solid red");                                                                                    
+                                    }
+
+                                    // setTimeout(function(){
+                                    //     thisElement.css("border", "0px");
+                                    // }, 1500);
                                 }
                             } else {
                                 console.error("Missing \"format\" option.");
@@ -129,14 +179,17 @@
                         } else if (typeOptionValue === "custom") {
                             if (callbackOption)
                             {
-    
+                                callbackOptionValue(thisElement);
                             } else {
                                 console.error("Missing \"callback\" option.");
                             }
                         }
                     }
                 } else {
-                    setCaretPosition(thisElement.get(0), auxCharIdxFinal+1);
+                    if (textValue.length === 0)
+                        thisElement.setCaretPos(0);
+                    else
+                        thisElement.setCaretPos(auxCharIdxFinal + 1);
                 }
     
                 return true;
